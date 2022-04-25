@@ -11,14 +11,16 @@ namespace Payment.Gateway.Mappers
         {
             CreateMap<Models.CreateTransaction, MongoDb.Models.Transaction>()
                 .ForMember(dest => dest.CreatedDateTime, opt => opt.Ignore())
-                .ForMember(dest => dest.TransactionId, opt => opt.Ignore());
+                .ForMember(dest => dest.TransactionId, opt => opt.Ignore())
+                .ForMember(dest => dest.Status, opt => opt.Ignore());
 
             CreateMap<MongoDb.Models.Transaction, PaymentTransactionRequest>()
                 .ForMember(dest => dest.ProviderId, opt => opt.Ignore());
 
             CreateMap<Messaging.Subscription.MerchantCreated.MerchantCreatedEvent, MongoDb.Models.Merchant>();
 
-            CreateMap<MongoDb.Models.Transaction,TransactionCreatedEvent>();
+            CreateMap<MongoDb.Models.Transaction,TransactionCreatedEvent>()
+                .ForMember(dest => dest.EventName, opt => opt.Ignore());
 
             CreateMap<MongoDb.Models.Transaction, TransactionResponse>();
         }
