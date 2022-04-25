@@ -11,7 +11,7 @@ namespace Payment.Gateway.Configuration
     {
         public static IServiceCollection AddMessaging(this IServiceCollection services, IConfiguration configuration)
         {
-            //services.AddSingleton<IPublisher<MerchantCreatedEvent>, Publisher<MerchantCreatedEvent>>();
+            services.AddSingleton<IPublisher<TransactionCreatedEvent>, Publisher<TransactionCreatedEvent>>();
 
             var host = configuration["RabbitMQHost"];
             var port = int.Parse(configuration["RabbitMQPort"]);

@@ -1,5 +1,8 @@
 ﻿using AutoMapper;
 using FluentValidation;
+using FluentValidation.Results;
+using Payment.Gateway.HttpClients.AcquiringBank;
+using Payment.Gateway.HttpClients.AcquiringBank.Models;
 using Payment.Gateway.Messaging.Publisher;
 using Payment.Gateway.Messaging.Publisher.Events;
 using Payment.Gateway.Models;
@@ -17,47 +20,66 @@ namespace Payment.Gateway.Services
         private readonly IValidator<CreateTransaction> _createTransactionValidator;
         private readonly IPublisher<TransactionCreatedEvent> _publisher;
         private readonly IAcquiringBankClient _acquiringBankClient;
+        private readonly IMaskCardNumber _maskCardNumber;
 
-
-        public TransactionService(IMerchantRepository merchantRepository, IMapper mapper, IDateTimeProvider dateTimeProvider, IPublisher<TransactionCreatedEvent> publisher, IValidator<CreateTransaction> createTransactionValidator, IAcquiringBankClient acquiringBankClient)
+        public TransactionService(IMerchantRepository merchantRepository, IMapper mapper,
+            IDateTimeProvider dateTimeProvider, IPublisher<TransactionCreatedEvent> publisher,
+            IValidator<CreateTransaction> createTransactionValidator, IAcquiringBankClient acquiringBankClient,
+            ITransactionRepository transactionRepository, IMaskCardNumber maskCardNumber)
         {
-           _merchantRepository = merchantRepository;
-           _mapper = mapper;
-           _dateTimeProvider = dateTimeProvider;
-           _publisher = publisher;
-           _createTransactionValidator = createTransactionValidator;
-           _acquiringBankClient = acquiringBankClient;;
+            _merchantRepository = merchantRepository;
+            _mapper = mapper;
+            _dateTimeProvider = dateTimeProvider;
+            _publisher = publisher;
+            _createTransactionValidator = createTransactionValidator;
+            _acquiringBankClient = acquiringBankClient;
+            _transactionRepository = transactionRepository;
+            _maskCardNumber = maskCardNumber;
         }
 
-        public async Task MakeTransaction(Models.CreateTransaction transaction)
+        public async Task<TransactionResponse> MakeTransaction(Models.CreateTransaction createTransaction)
         {
-            var merchant  = _merchantRepository.GetMerchant(transaction.MerchantId);
-            if(merchant == null)
+            var validationErrors = new List<ValidationFailure>();
+
+            // check merchant if it exists
+            var merchant = await _merchantRepository.GetMerchant(createTransaction.MerchantId);
+            if (merchant == null)
             {
-                throw new InvalidOperationException("merchant doesn't exists");
+                validationErrors.Add(new ValidationFailure(nameof(CreateTransaction.MerchantId), "merchant doesn't exists"));
             }
 
             // validator
-            var validationResult = await _createTransactionValidator.ValidateAsync(transaction);
+            var validationResult = await _createTransactionValidator.ValidateAsync(createTransaction);
             if (!validationResult.IsValid)
             {
-                throw new ValidationException(validationResult.Errors);
+                validationErrors.AddRange(validationResult.Errors);
             }
 
+            if (validationErrors.Any())
+            {
+                throw new ValidationException(validationErrors);
+            }
+
+            // create createTransaction model
+            var transaction = _mapper.Map<MongoDb.Models.Transaction>(createTransaction);
+            transaction.TransactionId = Guid.NewGuid();
+            transaction.CreatedDateTime = _dateTimeProvider.UtcNow;
+
             // acquiring bank
-            var transactionModel = _mapper.Map<MongoDb.Models.Transaction>(merchant);
-            transactionModel.TransactionId = Guid.NewGuid();
+            var transactionResponse = await _acquiringBankClient.MakePayment(_mapper.Map<PaymentTransactionRequest>(transaction));
+            transaction.Status = transactionResponse.Status;
 
             // insert in to db 
-            _transactionRepository.InsertTransaction(transactionModel);
+            await _transactionRepository.InsertTransaction(transaction);
 
             // publish TransactionCreatedEvent
-            var transactionCreatedEvent = _mapper.Map<TransactionCreatedEvent>(transactionModel);
+            var transactionCreatedEvent = _mapper.Map<TransactionCreatedEvent>(transaction);
+            // mask card number before publishing
+            transactionCreatedEvent.CardNumber = _maskCardNumber.Mask(transactionCreatedEvent.CardNumber);
+
             await _publisher.PublishAsync(transactionCreatedEvent);
 
+            return _mapper.Map<TransactionResponse>(transaction);
         }
-
-
-       
     }
 }

@@ -18,7 +18,7 @@ namespace Payment.Gateway.Configuration
             services.AddSingleton<IMongoContext, MongoContext>();
 
             services.AddSingleton<IMerchantRepository, MerchantRepository>();
-
+            services.AddSingleton<ITransactionRepository, TransactionRepository>();
             return services;
         }
     }

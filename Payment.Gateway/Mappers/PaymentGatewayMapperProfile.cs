@@ -1,4 +1,7 @@
 ﻿using AutoMapper;
+using Payment.Gateway.HttpClients.AcquiringBank.Models;
+using Payment.Gateway.Messaging.Publisher.Events;
+using Payment.Gateway.Models;
 
 namespace Payment.Gateway.Mappers
 {
@@ -6,15 +9,18 @@ namespace Payment.Gateway.Mappers
     {
         public PaymentGatewayMapperProfile()
         {
-            //CreateMap<Models.CreateMerchant, MongoDb.Models.Merchant>()
-            //    .ForMember(dest => dest.CreatedDate, opt => opt.Ignore())
-            //    .ForMember(dest => dest.MerchantId, opt => opt.Ignore());
+            CreateMap<Models.CreateTransaction, MongoDb.Models.Transaction>()
+                .ForMember(dest => dest.CreatedDateTime, opt => opt.Ignore())
+                .ForMember(dest => dest.TransactionId, opt => opt.Ignore());
 
-            //CreateMap<Models.Merchant, MongoDb.Models.Merchant>()
-            //    .ForMember(dest => dest.CreatedDate, opt => opt.Ignore())
-            //    .ReverseMap();
+            CreateMap<MongoDb.Models.Transaction, PaymentTransactionRequest>()
+                .ForMember(dest => dest.ProviderId, opt => opt.Ignore());
 
             CreateMap<Messaging.Subscription.MerchantCreated.MerchantCreatedEvent, MongoDb.Models.Merchant>();
+
+            CreateMap<MongoDb.Models.Transaction,TransactionCreatedEvent>();
+
+            CreateMap<MongoDb.Models.Transaction, TransactionResponse>();
         }
     }
 }

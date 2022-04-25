@@ -1,7 +1,9 @@
-﻿namespace Payment.Gateway.Services
+﻿using Payment.Gateway.Models;
+
+namespace Payment.Gateway.Services
 {
     public interface ITransactionService
     {
-        Task MakeTransaction(Models.CreateTransaction transaction);
+        Task<TransactionResponse> MakeTransaction(Models.CreateTransaction createTransaction);
     }
 }
